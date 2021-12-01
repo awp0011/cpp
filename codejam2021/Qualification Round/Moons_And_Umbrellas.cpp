@@ -1,7 +1,6 @@
 #include <iostream>
 #include <string>
 
-#define MAX 0x3f3f3f3f
 using namespace std;
 int cost[2][2] = {{0, 0},
                   {0, 0}};

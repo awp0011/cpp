@@ -1,30 +1,24 @@
-#include <ctime>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <string>
-#include <random>
-
-struct info1 {
-    int idx, rcnt;
-    double level;
-} qst[10000];
-
-struct info2 {
-    int idx, rcnt;
-    double level;
-    double hard_rare_real[10];
-    double hard_rare_hope[10];
-} peo[100];
 
 using namespace std;
-// float ;
-double prob[10000];
-bool ori_ret[100][10000];
 
-inline bool cmp1(info1 x, info1 y);
+const int QC = 10000;
+const int PC = 100;
 
-inline bool cmp2(info2 x, info2 y);
+struct info {
+    int idx;
+    int cnt;
+    double lvl;
+    double w;
+} qs[QC + 5], ps[PC + 2];
+
+double prob[QC + 5];
+char str[PC + 2][QC + 2];
+
+inline bool cmp(info x, info y);
 
 inline void get_rand(int size);
 
@@ -36,36 +30,37 @@ inline double sigmoid(double x);
 
 inline int judge();
 
-random_device rd;  //Will be used to obtain a seed for the random number engine
-mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-uniform_real_distribution<> dis(-3.0, 3.0);
-
 int main() {
 
-    freopen("C:\\Users\\peng0\\Downloads\\cheating_detection_sample_ts1_input.txt", "r", stdin);
+    //freopen("C:\\Users\\peng0\\Downloads\\cheating_detection_sample_ts1_input.txt", "r", stdin);
     ios::sync_with_stdio(false), cin.tie(nullptr);
     int T, P, ans;
-    string ret;
     cin >> T >> P;
     for (int tc = 1; tc <= T; tc++) {
         //初始化 问题
-        for (int j = 0; j < 10000; j++) qst[j] = {j + 1, 0, 0};
+        for (int j = 0; j < QC; j++) {
+            qs[j].idx = j;
+            qs[j].lvl = 0;
+            qs[j].cnt = 0;
+            qs[j].w = 0;
+        }
         // read case
-        for (int i = 0; i < 100; i++) {
-            cin >> ret;
-            peo[i] = {i + 1, 0, 0, {0}};
-            for (int j = 0; j < 10000; j++) {
-                ori_ret[i][j] = false;
-                if (ret[j] == '1') {
-                    peo[i].rcnt++;
-                    qst[j].rcnt++;
-                    ori_ret[i][j] = true;
-                }
+        for (int i = 0; i < PC; i++) {
+            cin >> str[i];
+            ps[i].idx = i;
+            ps[i].lvl = 0;
+            ps[i].cnt = 0;
+            ps[i].w = 0;
+            for (int j = 0; j < QC; j++) {
+                if (str[i][j] == '1')
+                    ps[i].cnt++;
+                else
+                    qs[j].cnt++;
             }
         }
         //排序
-        sort(peo, peo + 100, cmp2);
-        sort(qst, qst + 10000, cmp1);
+        sort(ps, ps + PC, cmp);
+        sort(qs, qs + QC, cmp);
         //指定人的skill level
         set_peo_level();
         //指定题目difficult level
@@ -78,55 +73,45 @@ int main() {
     return 0;
 }
 
-// 0~1之间的随机数
+inline double get_rand() { return (double) rand() / RAND_MAX * 6 - 3; }
 
-
-inline bool cmp1(info1 x, info1 y) { return x.rcnt > y.rcnt; }
-
-inline bool cmp2(info2 x, info2 y) { return x.rcnt < y.rcnt; }
+inline bool cmp(info x, info y) { return x.cnt < y.cnt; }
 
 inline void set_peo_level() {
-    for (int i = 0; i < 100; i++) prob[i] = dis(gen);
-    sort(prob, prob + 100);
-    for (int i = 0; i < 100; i++) peo[i].level = prob[i];
+    for (int i = 0; i < PC; i++) prob[i] = get_rand();
+    sort(prob, prob + PC);
+    for (int i = 0; i < PC; i++) ps[i].lvl = prob[i];
 }
 
 inline void set_qst_level() {
-    for (int i = 0; i < 10000; i++) prob[i] = dis(gen);
-    sort(prob, prob + 10000);
-    for (int i = 0; i < 10000; i++) qst[i].level = prob[i];
+    for (int i = 0; i < QC; i++) prob[i] = get_rand();
+    sort(prob, prob + QC);
+    for (int i = 0; i < QC; i++) qs[i].lvl = prob[i];
 }
 
-inline double sigmoid(double x) { return 1 / (1 + exp(-x)); }
+
+// inline double sigmoid(double x) { return 1 / (1 + exp(-x)); }
+inline double sigmoid(double x) { return 1.0 / (1.0 + exp(-x)); }
 
 inline int judge() {
     int maxid = 0;
-    double maxd = 0, error;
-    //计算最难的1000个题目,10 *100
-    for (int p = 0; p < 100; p++) {
+    double maxd = 0;
+    for (int k = 0; k < PC; k++) {
         int id = 9999;
-        error = 0;
-        for (int i = 0; i < 10; i++) {
-            peo[p].hard_rare_real[i] = 0;
-            peo[p].hard_rare_hope[i] = 0;
-            for (int j = 0; j < 100; j++) {
-                //实际结果
-                if (ori_ret[peo[p].idx - 1][qst[id].idx - 1])
-                    peo[p].hard_rare_real[i]++;
-                //期望结果
-                peo[p].hard_rare_hope[i] += sigmoid(peo[p].level - qst[id--].level);
-            }
-            peo[p].hard_rare_real[i] /= 100;
-            //最难得700题目，成功率达到50%，则输出结果
-//            if (i < 7 && peo[p].hard_rare_real[i] >= 0.5) return peo[p].idx;
+        ps[k].w = 0;
+        for (int i = 99; i >= 95; i--) {//计算最难的500个题目,5 *100
+            double real = 0, hope = 0;
 
-            peo[p].hard_rare_hope[i] /= 100;
-            error += abs(peo[p].hard_rare_real[i] - peo[p].hard_rare_hope[i]);
-            if (error > maxd) {  //计算期望结果和实际结果
-                maxd = error;
-                maxid = peo[p].idx;
+            for (int j = 0; j < 100; j++) {
+                real += (str[ps[k].idx][qs[id].idx] == '1');  //实际结果
+                hope += sigmoid(ps[k].lvl - qs[id--].lvl);    //期望结果
             }
+            ps[k].w += (real - hope) * pow(i, 2);//pow 当做是题目块的权值，100个题目为一块
+        }
+        if (ps[k].w > maxd) {  //计算期望结果和实际结果
+            maxd = ps[k].w;
+            maxid = ps[k].idx;
         }
     }
-    return maxid;
+    return maxid + 1;
 }
